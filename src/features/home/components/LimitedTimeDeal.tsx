@@ -1,114 +1,167 @@
+
 "use client";
 
-import React, { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
+import type { UIEvent } from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 
 export default function LimitedTimeDeal() {
-    const scrollRef:any = useRef(null);
-    const [activeIndex, setActiveIndex] = useState(0);
-    const totalCards = 7; // Kartalarning jami soni
-    const cardsPerView = 4; // Ekranda ko'rinadigan kartalar soni
-    const totalDots = Math.ceil(totalCards / cardsPerView);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Scroll qilinganda qaysi nuqta faol ekanligini aniqlash
-    const handleScroll = () => {
-        if (scrollRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-            const maxScroll = scrollWidth - clientWidth;
-            if (maxScroll <= 0) return;
-            const currentProgress = scrollLeft / maxScroll;
-            const newIndex = Math.round(currentProgress * (totalDots - 1));
-            setActiveIndex(newIndex);
-        }
-    };
-    // Nuqtani bosganda o'sha qismga o'tish
-    const scrollToPage = (index:any) => {
-        if (scrollRef.current) {
-            const { scrollWidth, clientWidth } = scrollRef.current;
-            const maxScroll = scrollWidth - clientWidth;
-            const targetScroll = (maxScroll / (totalDots - 1)) * index;
-            scrollRef.current.scrollTo({ left: targetScroll, behavior: 'smooth' });
-        }
-    };
-    // Chap va o'ng tugmalar bosilganda surish
-    const scrollByDirection = (direction:any) => {
-        if (scrollRef.current) {
-            const { clientWidth } = scrollRef.current;
-            const scrollAmount = clientWidth * 0.75; // Bir martada qancha surilishi
-            scrollRef.current.scrollBy({
-                left: direction === 'left' ? -scrollAmount : scrollAmount,
-                behavior: 'smooth'
-            });
-        }
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [totalDots, setTotalDots] = useState(1);
+
+  const totalCards = 7;
+
+  useEffect(() => {
+    const container = scrollRef.current;
+
+    if (!container) return;
+
+    const updateDots = () => {
+      const maxScroll = container.scrollWidth - container.clientWidth;
+
+      if (maxScroll <= 0 || container.clientWidth <= 0) {
+        setTotalDots(1);
+        setActiveIndex(0);
+        return;
+      }
+
+      const dots = Math.max(
+        1,
+        Math.ceil(container.scrollWidth / container.clientWidth)
+      );
+
+      setTotalDots(dots);
+
+      const progress = container.scrollLeft / maxScroll;
+      setActiveIndex(Math.round(progress * (dots - 1)));
     };
 
-    return (
-        <div className='max-w-310 w-full mx-auto flex flex-col justify-center gap-8 pb-25'>
-            {/* Sarlavha, Chap/O'ng tugmalar va View All */}
-            <div className='flex items-center justify-between px-4'>
-                <p className='font-bold text-[32px]'>Limited-Time Deal</p>
+    updateDots();
 
-                <div className='flex items-center gap-4'>
-                    {/* Chap va O'ngga surish tugmalari */}
+    const resizeObserver = new ResizeObserver(updateDots);
+    resizeObserver.observe(container);
 
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
-                    <button className='border border-black rounded-[200px] px-6 py-3 cursor-pointer hover:bg-black hover:text-white transition-all duration-300'>
-                        View All
-                    </button>
-                </div>
-            </div>
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    const container = event.currentTarget;
+    const maxScroll = container.scrollWidth - container.clientWidth;
 
-            {/* Scroll bo'ladigan kartalar */}
-            <div className='px-4'>
+    if (maxScroll <= 0 || totalDots <= 1) {
+      setActiveIndex(0);
+      return;
+    }
 
-                <div className='flex gap-2 items-center justify-center'>
-                    <button
-                        onClick={() => scrollByDirection('left')}
-                        className='border border-black rounded-full p-3 hover:bg-black hover:text-white transition-all cursor-pointer'
-                    >
-                        <FaChevronLeft size={16} />
-                    </button>
+    const progress = container.scrollLeft / maxScroll;
+    const newIndex = Math.round(progress * (totalDots - 1));
 
-                    <div
-                        ref={scrollRef}
-                        onScroll={handleScroll}
-                        className='flex items-center gap-6 overflow-x-auto scroll-smooth no-scrollbar pb-4'
-                    >
-                        {[...Array(totalCards)].map((_, i) => (
-                            <div key={i} className='bg-[#ccc] rounded-2xl w-68 h-100 shrink-0'></div>
-                        ))}
-                    </div>
+    setActiveIndex(newIndex);
+  };
 
-                    <button
-                        onClick={() => scrollByDirection('right')}
-                        className='border border-black rounded-full p-3 hover:bg-black hover:text-white transition-all cursor-pointer'
-                    >
-                        <FaChevronRight size={16} />
-                    </button>
-                </div>
+  const scrollToPage = (index: number) => {
+    const container = scrollRef.current;
 
-                {/* Pastdagi nuqtali indikatorlar */}
+    if (!container) return;
 
+    const maxScroll = container.scrollWidth - container.clientWidth;
 
+    if (totalDots <= 1) {
+      container.scrollTo({ left: 0, behavior: "smooth" });
+      return;
+    }
 
-                <div className='flex items-center justify-center gap-1.5'>
-                    {[...Array(totalDots)].map((_, index) => (
-                        <button
-                            key={index}
-                            onClick={() => scrollToPage(index)}
-                            className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${activeIndex === index
-                                ? 'w-8 bg-black'
-                                : 'w-2 bg-gray-300 hover:bg-gray-400'
-                                }`}
-                        />
-                    ))}
-                </div>
+    const targetScroll = (maxScroll / (totalDots - 1)) * index;
 
+    container.scrollTo({
+      left: targetScroll,
+      behavior: "smooth",
+    });
+  };
 
+  const scrollByDirection = (direction: "left" | "right") => {
+    const container = scrollRef.current;
 
+    if (!container) return;
 
+    const scrollAmount = container.clientWidth * 0.75;
 
-            </div>
+    container.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  };
+
+  return (
+    <div className="mx-auto flex w-full max-w-[1240px] flex-col justify-center gap-8 pb-25">
+      <div className="flex items-center justify-between px-4">
+        <p className="text-[24px] font-bold sm:text-[32px]">
+          Limited-Time Deal
+        </p>
+
+        <button
+          type="button"
+          onClick={() => scrollToPage(totalDots - 1)}
+          className="cursor-pointer rounded-full border border-black px-4 py-2 transition-all duration-300 hover:bg-black hover:text-white sm:px-6 sm:py-3"
+        >
+          View All
+        </button>
+      </div>
+
+      <div className="px-4">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-label="Oldingi mahsulotlar"
+            onClick={() => scrollByDirection("left")}
+            className="shrink-0 cursor-pointer rounded-full border border-black p-3 transition-all hover:bg-black hover:text-white"
+          >
+            <FaChevronLeft size={16} />
+          </button>
+
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="no-scrollbar flex min-w-0 flex-1 items-center gap-6 overflow-x-auto scroll-smooth pb-4"
+          >
+            {Array.from({ length: totalCards }, (_, index) => (
+              <div
+                key={index}
+                className="h-[400px] w-[272px] shrink-0 rounded-2xl bg-[#ccc]"
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            aria-label="Keyingi mahsulotlar"
+            onClick={() => scrollByDirection("right")}
+            className="shrink-0 cursor-pointer rounded-full border border-black p-3 transition-all hover:bg-black hover:text-white"
+          >
+            <FaChevronRight size={16} />
+          </button>
         </div>
-    );
+
+        <div className="mt-4 flex items-center justify-center gap-1.5">
+          {Array.from({ length: totalDots }, (_, index) => (
+            <button
+              key={index}
+              type="button"
+              aria-label={`${index + 1}-sahifaga o'tish`}
+              onClick={() => scrollToPage(index)}
+              className={`h-2 cursor-pointer rounded-full transition-all duration-300 ${
+                activeIndex === index
+                  ? "w-8 bg-black"
+                  : "w-2 bg-gray-300 hover:bg-gray-400"
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }

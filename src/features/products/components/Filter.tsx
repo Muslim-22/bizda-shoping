@@ -1,6 +1,7 @@
-'use client'
 
-import React from 'react'
+"use client";
+
+import React from "react";
 import {
   Button,
   Checkbox,
@@ -9,62 +10,62 @@ import {
   InputNumber,
   Tooltip,
   Typography,
-} from 'antd'
+} from "antd";
 import {
   usePathname,
   useRouter,
   useSearchParams,
-} from 'next/navigation'
-import Link from 'next/link'
+} from "next/navigation";
+import Link from "next/link";
 
-const { Title, Text } = Typography
+const { Title, Text } = Typography;
 
 type FilterValues = {
-  categories: string[]
-  brands: string[]
-  minPrice: number | null
-  maxPrice: number | null
-}
+  categories: string[];
+  brands: string[];
+  minPrice: number | null;
+  maxPrice: number | null;
+};
 
 type FilterOption = {
-  label: string
-  value: string
-}
+  label: string;
+  value: string;
+};
 
 type FilterProps = {
-  categories?: FilterOption[]
-  brands?: FilterOption[]
-  onApply?: (filters: FilterValues) => void
-}
+  categories?: FilterOption[];
+  brands?: FilterOption[];
+  onApply?: (filters: FilterValues) => void;
+};
 
 type LastChanged = {
-  type: 'categories' | 'brands'
-  value: string
-} | null
+  type: "categories" | "brands";
+  value: string;
+} | null;
 
 const initialFilters: FilterValues = {
   categories: [],
   brands: [],
   minPrice: null,
   maxPrice: null,
-}
+};
 
 function readFilters(params: URLSearchParams): FilterValues {
-  const min = params.get('minPrice')
-  const max = params.get('maxPrice')
+  const min = params.get("minPrice");
+  const max = params.get("maxPrice");
 
   return {
-    categories: params.getAll('category'),
-    brands: params.getAll('brand'),
+    categories: params.getAll("category"),
+    brands: params.getAll("brand"),
     minPrice:
-      min !== null && min !== '' && Number.isFinite(Number(min))
+      min !== null && min.trim() !== "" && Number.isFinite(Number(min))
         ? Number(min)
         : null,
     maxPrice:
-      max !== null && max !== '' && Number.isFinite(Number(max))
+      max !== null && max.trim() !== "" && Number.isFinite(Number(max))
         ? Number(max)
         : null,
-  }
+  };
 }
 
 export default function Filter({
@@ -72,178 +73,185 @@ export default function Filter({
   brands = [],
   onApply,
 }: FilterProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const searchParamsString = searchParams.toString()
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchParamsString = searchParams.toString();
 
-  const [filters, setFilters] = React.useState<FilterValues>(() =>
-    readFilters(new URLSearchParams(searchParamsString)),
-  )
+  // URL dagi filtrlar o'zgarganda yangi boshlang'ich qiymatlarni hisoblaymiz.
+  const urlFilters = React.useMemo(
+    () => readFilters(new URLSearchParams(searchParamsString)),
+    [searchParamsString]
+  );
+
+  // Foydalanuvchi joriy sahifada o'zgartirgan filtrlar.
+  const [draftFilters, setDraftFilters] =
+    React.useState<FilterValues | null>(null);
 
   const [lastChanged, setLastChanged] =
-    React.useState<LastChanged>(null)
+    React.useState<LastChanged>(null);
 
-  // Browser back/forward orqali URL o'zgarsa,
-  // filterlarni URL bilan sinxronlashtirish
-  React.useEffect(() => {
-    setFilters(readFilters(new URLSearchParams(searchParamsString)))
-    setLastChanged(null)
-  }, [searchParamsString])
+  // URL o'zgargan bo'lsa, draft qiymatlar eskirgan hisoblanadi.
+  const filters = draftFilters ?? urlFilters;
 
   const priceError =
     filters.minPrice !== null &&
     filters.maxPrice !== null &&
-    filters.minPrice > filters.maxPrice
+    filters.minPrice > filters.maxPrice;
 
   const updateFilter = <K extends keyof FilterValues>(
     key: K,
-    value: FilterValues[K],
+    value: FilterValues[K]
   ) => {
-    if (key === 'categories' || key === 'brands') {
-      const selectedValues = value as string[]
-      const previousValues = filters[key] as string[]
+    const currentFilters = draftFilters ?? urlFilters;
+
+    if (key === "categories" || key === "brands") {
+      const selectedValues = value as string[];
+      const previousValues = currentFilters[key] as string[];
 
       const addedValue = selectedValues.find(
-        (item) => !previousValues.includes(item),
-      )
+        (item) => !previousValues.includes(item)
+      );
 
       if (addedValue) {
         setLastChanged({
           type: key,
           value: addedValue,
-        })
+        });
       } else {
         setLastChanged((previous) => {
-          if (!previous) return null
+          if (!previous) return null;
 
-          // Olib tashlangan checkbox oxirgi tanlangan
-          // checkbox bo'lsa, qolgan tanlanganini topish
           if (
             previous.type === key &&
             !selectedValues.includes(previous.value)
           ) {
-            const remainingValue = selectedValues.at(-1)
+            const remainingValue = selectedValues.at(-1);
 
             return remainingValue
               ? { type: key, value: remainingValue }
-              : null
+              : null;
           }
 
-          return previous
-        })
+          return previous;
+        });
       }
     }
 
-    setFilters((previous) => ({
-      ...previous,
+    setDraftFilters({
+      ...currentFilters,
       [key]: value,
-    }))
-  }
+    });
+  };
 
   const updateUrl = (values: FilterValues) => {
-    const params = new URLSearchParams(searchParamsString)
+    const params = new URLSearchParams(searchParamsString);
 
-    // Avval eski filter parametrlarini o'chirish
-    params.delete('category')
-    params.delete('brand')
-    params.delete('minPrice')
-    params.delete('maxPrice')
+    params.delete("category");
+    params.delete("brand");
+    params.delete("minPrice");
+    params.delete("maxPrice");
 
-    // Tanlangan kategoriyalar
     values.categories.forEach((category) => {
-      params.append('category', category)
-    })
+      params.append("category", category);
+    });
 
-    // Tanlangan brendlar
     values.brands.forEach((brand) => {
-      params.append('brand', brand)
-    })
+      params.append("brand", brand);
+    });
 
-    // Min narx
     if (values.minPrice !== null) {
-      params.set('minPrice', String(values.minPrice))
+      params.set("minPrice", String(values.minPrice));
     }
 
-    // Max narx
     if (values.maxPrice !== null) {
-      params.set('maxPrice', String(values.maxPrice))
+      params.set("maxPrice", String(values.maxPrice));
     }
 
-    const query = params.toString()
-    const url = query ? `${pathname}?${query}` : pathname
+    const query = params.toString();
+    const url = query ? `${pathname}?${query}` : pathname;
 
-    router.replace(url, { scroll: false })
-  }
+    router.replace(url, { scroll: false });
+  };
 
   const handleApply = () => {
-    if (priceError) return
+    if (priceError) return;
 
-    updateUrl(filters)
-    onApply?.(filters)
-    setLastChanged(null)
-  }
+    updateUrl(filters);
+    onApply?.(filters);
+    setDraftFilters(null);
+    setLastChanged(null);
+  };
 
   const resetFilters = () => {
-    setFilters({ ...initialFilters })
-    setLastChanged(null)
-
-    updateUrl(initialFilters)
-    onApply?.({ ...initialFilters })
-  }
+    setDraftFilters(null);
+    setLastChanged(null);
+    updateUrl(initialFilters);
+    onApply?.(initialFilters);
+  };
 
   const renderOptions = (
     options: FilterOption[],
     selected: string[],
-    type: 'categories' | 'brands',
-    onChange: (values: string[]) => void,
+    type: "categories" | "brands",
+    onChange: (values: string[]) => void
   ) => (
     <div className="max-h-[200px] overflow-y-auto overflow-x-hidden pr-2">
       <div className="flex flex-col gap-3">
         {options.map((option) => {
-          const isSelected = selected.includes(option.value)
+          const isSelected = selected.includes(option.value);
           const showApply =
             isSelected &&
             lastChanged?.type === type &&
-            lastChanged.value === option.value
+            lastChanged.value === option.value;
 
           return (
             <div
               key={option.value}
               className="flex items-center justify-between gap-2"
             >
-              {
-                type == "categories" && <Link className={`text-inherit!  ${pathname.includes(option.value) && "font-bold!"}`} href={`/products/${option.value}`}>{option.label}</Link>
-              }
-              {
-                type == "brands" && <Checkbox
+              {type === "categories" && (
+                <Link
+                  className={`text-inherit ${
+                    pathname.includes(option.value) ? "font-bold" : ""
+                  }`}
+                  href={`/products/${option.value}`}
+                >
+                  {option.label}
+                </Link>
+              )}
+
+              {type === "brands" && (
+                <Checkbox
                   checked={isSelected}
                   onChange={(event) => {
-                    const checked = event.target.checked
+                    const checked = event.target.checked;
 
                     const nextValues = checked
                       ? [...selected, option.value]
-                      : selected.filter((value) => value !== option.value)
+                      : selected.filter(
+                          (value) => value !== option.value
+                        );
 
-                    onChange(nextValues)
+                    onChange(nextValues);
 
-                    // Uncheck qilinganda URL'ni darhol yangilash
                     if (!checked) {
-                      const nextFilters = {
-                        ...filters,
+                      const currentFilters = draftFilters ?? urlFilters;
+                      const nextFilters: FilterValues = {
+                        ...currentFilters,
                         [type]: nextValues,
-                      }
+                      };
 
-                      updateUrl(nextFilters)
-                      onApply?.(nextFilters)
-                      setLastChanged(null)
+                      updateUrl(nextFilters);
+                      onApply?.(nextFilters);
+                      setDraftFilters(null);
+                      setLastChanged(null);
                     }
                   }}
                 >
                   {option.label}
                 </Checkbox>
-              }
-
+              )}
 
               {showApply && (
                 <Tooltip
@@ -262,15 +270,15 @@ export default function Filter({
                 </Tooltip>
               )}
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 
   const collapseItems = [
     {
-      key: 'categories',
+      key: "categories",
       label: (
         <span className="font-semibold text-gray-800">
           Kategoriyalar
@@ -279,12 +287,12 @@ export default function Filter({
       children: renderOptions(
         categories,
         filters.categories,
-        'categories',
-        (values) => updateFilter('categories', values),
+        "categories",
+        (values) => updateFilter("categories", values)
       ),
     },
     {
-      key: 'brands',
+      key: "brands",
       label: (
         <span className="font-semibold text-gray-800">
           Brendlar
@@ -293,15 +301,14 @@ export default function Filter({
       children: renderOptions(
         brands,
         filters.brands,
-        'brands',
-        (values) => updateFilter('brands', values),
+        "brands",
+        (values) => updateFilter("brands", values)
       ),
     },
-  ]
+  ];
 
   return (
     <aside className="w-full min-w-0 max-w-[300px] rounded-lg border border-gray-200 bg-white px-3 py-4">
-      {/* Filter sarlavhasi */}
       <div className="flex items-center justify-between">
         <Title level={5} className="!mb-0">
           Filter
@@ -319,17 +326,15 @@ export default function Filter({
 
       <Divider className="!my-3" />
 
-      {/* Kategoriyalar va brendlar */}
       <Collapse
         ghost
-        defaultActiveKey={['categories', 'brands']}
+        defaultActiveKey={["categories", "brands"]}
         items={collapseItems}
         className="[&_.ant-collapse-header]:!px-0 [&_.ant-collapse-content-box]:!px-0 [&_.ant-collapse-content-box]:!pt-1"
       />
 
       <Divider className="!my-3" />
 
-      {/* Narx oralig'i */}
       <section>
         <Title level={5} className="!mb-3">
           Narx oralig‘i
@@ -337,10 +342,7 @@ export default function Filter({
 
         <div className="grid grid-cols-2 gap-2">
           <div className="min-w-0">
-            <Text
-              type="secondary"
-              className="mb-1 block text-xs"
-            >
+            <Text type="secondary" className="mb-1 block text-xs">
               Min narx
             </Text>
 
@@ -350,27 +352,24 @@ export default function Filter({
               min={0}
               value={filters.minPrice}
               onChange={(value) =>
-                updateFilter('minPrice', value)
+                updateFilter(
+                  "minPrice",
+                  typeof value === "number" ? value : null
+                )
               }
               formatter={(value) =>
                 value === undefined || value === null
-                  ? ''
-                  : `${value}`.replace(
-                    /\B(?=(\d{3})+(?!\d))/g,
-                    ' ',
-                  )
+                  ? ""
+                  : `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
               }
               parser={(value) =>
-                (value ?? '').replace(/\s/g, '')
+                Number((value ?? "").replace(/\s/g, "") || 0)
               }
             />
           </div>
 
           <div className="min-w-0">
-            <Text
-              type="secondary"
-              className="mb-1 block text-xs"
-            >
+            <Text type="secondary" className="mb-1 block text-xs">
               Max narx
             </Text>
 
@@ -380,18 +379,18 @@ export default function Filter({
               min={0}
               value={filters.maxPrice}
               onChange={(value) =>
-                updateFilter('maxPrice', value)
+                updateFilter(
+                  "maxPrice",
+                  typeof value === "number" ? value : null
+                )
               }
               formatter={(value) =>
                 value === undefined || value === null
-                  ? ''
-                  : `${value}`.replace(
-                    /\B(?=(\d{3})+(?!\d))/g,
-                    ' ',
-                  )
+                  ? ""
+                  : `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, " ")
               }
               parser={(value) =>
-                (value ?? '').replace(/\s/g, '')
+                Number((value ?? "").replace(/\s/g, "") || 0)
               }
             />
           </div>
@@ -405,17 +404,17 @@ export default function Filter({
 
         {(filters.minPrice !== null ||
           filters.maxPrice !== null) && (
-            <Button
-              type="primary"
-              size="small"
-              className="!mt-3"
-              disabled={priceError}
-              onClick={handleApply}
-            >
-              Narxni qo‘llash
-            </Button>
-          )}
+          <Button
+            type="primary"
+            size="small"
+            className="!mt-3"
+            disabled={priceError}
+            onClick={handleApply}
+          >
+            Narxni qo‘llash
+          </Button>
+        )}
       </section>
     </aside>
-  )
+  );
 }
